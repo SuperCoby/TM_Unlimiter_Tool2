@@ -76,7 +76,7 @@ class SNA_OT_OpenDocumentation(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        webbrowser.open('https://docs.google.com/document/d/1NPc3UE9vzHdGh73wqbt_pFpTByCeFQFgEFyGJ88DiCs/edit')
+        webbrowser.open('https://github.com/tomek0055/TMUnlimiter/wiki')
         return {"FINISHED"}
         
 # Operator to open github
@@ -98,7 +98,7 @@ class SNA_OT_OpenWeb(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        webbrowser.open('https://github.com/SuperCoby/')
+        webbrowser.open('https://supercoby.pages.dev/')
         return {"FINISHED"}
 
 
@@ -110,7 +110,7 @@ class SNA_OT_OpenDiscord(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        webbrowser.open('https://discord.gg/n8mW58Uq')
+        webbrowser.open('https://discord.gg/uD4UAJr')
         return {"FINISHED"}
 
 
