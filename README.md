@@ -4,7 +4,7 @@
 
 <p align="center">
 <a href="[https://tmnf.exchange/threadshow/6517627?page=auto](https://unlimiter.net/download)" target="blank">
-<img src="https://img.shields.io/badge/Unlimiter-2.0" alt="Trackmania Unlimiter" />
+<img src="https://img.shields.io/badge/Unlimiter-2.0-2" alt="Trackmania Unlimiter" />
 </a>
 <a href="https://discord.gg/uD4UAJr" target="blank">
 <img src="https://img.shields.io/badge/Discord%20-official-brightgreen" alt="Discord Unlimiter"/>
