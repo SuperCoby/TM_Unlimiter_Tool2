@@ -1,5 +1,4 @@
 import bpy
-from os import path
 
 class SNA_OT_Intersectingemptyobjects_50398(bpy.types.Operator):
     bl_idname = "sna.intersectingemptyobjects_50398"
@@ -72,12 +71,8 @@ class SNA_OT_Intersectingemptyobjects_50398(bpy.types.Operator):
             # Check the number of faces of each cube
             for empty_obj, cube_obj in zip(empty_objects, created_cubes):
                 num_faces = len(cube_obj.data.polygons)
-                print("Number of faces of cube at empty object", empty_obj.name, ":", num_faces)
                 if num_faces > 6:
                     intersecting_empty_objects.append(empty_obj)
-            
-            # Print intersecting empty objects
-            print("Intersecting empty objects:", intersecting_empty_objects)
             
             # Select intersecting empty objects
             bpy.ops.object.select_all(action='DESELECT')
@@ -97,8 +92,55 @@ class SNA_OT_Intersectingemptyobjects_50398(bpy.types.Operator):
     def invoke(self, context, event):
         return self.execute(context)
 
+def create_or_get_collection(name, parent=None, color_tag=None):
+    collection = bpy.data.collections.get(name)
+    if not collection:
+        collection = bpy.data.collections.new(name)
+        if parent:
+            parent.children.link(collection)
+        else:
+            bpy.context.scene.collection.children.link(collection)
+    if color_tag:
+        collection.color_tag = color_tag
+    return collection
 
-class VIEW3D_PT_CustomPanel(bpy.types.Panel):
+def add_empty_cube(name, location, scale, collection):
+    empty = bpy.data.objects.new(name, None)
+    empty.empty_display_type = 'CUBE'
+    empty.location = location
+    empty.scale = scale
+    collection.objects.link(empty)
+
+def add_multiple_empties(start_location, scale, rows, columns, step_x, step_y, collection, z_position, step_z):
+    for row in range(rows):
+        for col in range(columns):
+            name = f"{row},{z_position},{col}"
+            location = (
+                start_location[0] + col * step_x, 
+                start_location[1] + row * step_y, 
+                start_location[2] + z_position * step_z
+            )
+            add_empty_cube(name, location, scale, collection)
+
+def setup_block_units(rows, columns, start_location, scale, step_x, step_y, step_z, parent_collection, num_collections, z_offset_increment):
+    for i in range(num_collections):
+        collection_name = f"y{i}"
+        z_offset = i * z_offset_increment
+        start_location_z = start_location[2] + (z_offset * step_z)
+        collection = create_or_get_collection(collection_name, parent=parent_collection)
+        add_multiple_empties(
+            start_location=(start_location[0], start_location[1], start_location_z), 
+            scale=scale,
+            rows=rows,
+            columns=columns,
+            step_x=step_x,
+            step_y=step_y,
+            collection=collection,
+            z_position=z_offset,
+            step_z=step_z
+        )
+
+class BlockUnitPanel(bpy.types.Panel):
     bl_label = "Detection Units"
     bl_idname = "VIEW3D_PT_custom_panel"
     bl_space_type = "VIEW_3D"
@@ -111,17 +153,27 @@ class VIEW3D_PT_CustomPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-                 
-        layout.prop(scene.apv_settings, 'hide_non_selected', text="Hide Non-Selected")
-       
+        
+        # Ajout des paramètres d'unités de blocs
+        box = layout.box()
+        box.label(text="Block Units Parameters")
+        
+        row = box.row()
+        row.prop(scene, "block_units_environment", text="")
+        
         row = layout.row()
-        from .. import ADDON_ROOT_PATH
-        op = row.operator(OBJECT_OT_ImportCollection.bl_idname, text="Import Blockunits")
-        op.filepath = path.join(ADDON_ROOT_PATH, "assets", "Block_units", "blockunits.blend") + rf"\Collection\\"
-        op.filename = "blockunits"
-
-        # Ajout du bouton "Run"
-        layout.operator('sna.intersectingemptyobjects_50398', text='Detected Objects', icon_value=0, emboss=True, depress=False)
+        row.prop(scene, "block_units_rows", text="Y")
+        row.prop(scene, "block_units_columns", text="X")
+        row.prop(scene, "block_units_z", text="Z")
+        
+        box.operator("object.create_block_units", text="Import")
+        
+        # Ajout du bouton Hide Non-Selected
+        layout.prop(scene.apv_settings, 'hide_non_selected', text="Hide Non-Selected")
+        
+        # Le reste de ton code pour les objets vides
+        row = layout.row()
+        layout.operator('sna.intersectingemptyobjects_50398', text='Detected Objects', icon_value=0, emboss=True, depress=False,)
 
         box = layout.box()
         box.label(text="")
@@ -136,54 +188,160 @@ class VIEW3D_PT_CustomPanel(bpy.types.Panel):
                     flow.label(text=names[index])
 
 
-class APVSettings(bpy.types.PropertyGroup):
-    hide_non_selected: bpy.props.BoolProperty(
-        name="Hide Non-Selected Objects",
-        description="Toggle visibility of non-selected objects in the viewport",
-        default=False,
-        update=lambda self, context: update_visibility(context)
-    )
-
-def update_visibility(context):
-    settings = context.scene.apv_settings
-    for obj in context.scene.objects:
-        if obj.type == 'EMPTY' and not obj.select_get():
-            obj.hide_set(settings.hide_non_selected)
-
-
-class OBJECT_OT_ImportCollection(bpy.types.Operator):
-    """Tooltip"""
-    bl_idname = "object.import_collection"
-    bl_label = "Append Collection"
-    
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
-    filename: bpy.props.StringProperty()
+class CreateBlockUnitsOperator(bpy.types.Operator):
+    bl_idname = "object.create_block_units"
+    bl_label = "Create Block Units"
 
     def execute(self, context):
-        abs_path = path.abspath(self.filepath)
-        bpy.ops.wm.append(filename=self.filename, directory=abs_path)
+        scene = context.scene
+        environment = scene.block_units_environment
+
+        if environment in ['RALLY', 'BAY', 'STADIUM']:
+            start_location = (16, 16, 4)
+            scale = (16, 16, 4)
+            step_x = 32
+            step_y = 32
+            step_z = 4
+        elif environment == 'COAST':
+            start_location = (8, 8, 2)
+            scale = (8, 8, 2)
+            step_x = 16
+            step_y = 16
+            step_z = 2
+        elif environment == 'ISLAND':
+            start_location = (32, 32, 1)
+            scale = (32, 32, 1)
+            step_x = 64
+            step_y = 64
+            step_z = 1
+        elif environment in ['SNOW', 'DESERT']:
+            start_location = (16, 16, 8)
+            scale = (16, 16, 8)
+            step_x = 32
+            step_y = 32
+            step_z = 8
+        else:
+            start_location = (16, 16, 4)
+            scale = (16, 16, 4)
+            step_x = 32
+            step_y = 32
+            step_z = 4
+
+        rows = scene.block_units_rows
+        columns = scene.block_units_columns
+        z = scene.block_units_z
+        block_units_collection = create_or_get_collection("BlockUnits", color_tag='COLOR_03')
+
+        setup_block_units(
+            rows=rows, 
+            columns=columns, 
+            start_location=start_location, 
+            scale=scale, 
+            step_x=step_x, 
+            step_y=step_y, 
+            step_z=step_z, 
+            parent_collection=block_units_collection, 
+            num_collections=z,  
+            z_offset_increment=1
+        )
+
         return {'FINISHED'}
 
+# Define the custom property for the "Hide Non-Selected" toggle
+class APVSettings(bpy.types.PropertyGroup):
+    hide_non_selected: bpy.props.BoolProperty(
+        name="Hide Non-Selected",
+        description="Hide objects that are not selected",
+        default=False,
+        update=lambda self, context: self.toggle_hide_non_selected(context)
+    )
+    
+    def toggle_hide_non_selected(self, context):
+        # Cacher/afficher les objets non sélectionnés
+        for obj in context.scene.objects:
+            if obj.type == 'EMPTY':
+                if self.hide_non_selected and not obj.select_get():
+                    obj.hide_set(True)
+                else:
+                    obj.hide_set(False)
 
+class SNA_OT_DetectedObjects(bpy.types.Operator):
+    bl_idname = "sna.detectedobjects_50398"
+    bl_label = "Detected Objects"
+    bl_description = "Detect and list selected empty objects"
+    bl_options = {"REGISTER", "UNDO"}
+    bl_category = "Tools"
+
+    @classmethod
+    def poll(cls, context):
+        if bpy.app.version >= (3, 0, 0):
+            cls.poll_message_set('')
+        return not False
+
+    def execute(self, context):
+        selected_empty_objects = [obj for obj in bpy.context.scene.objects if obj.type == 'EMPTY' and obj.select_get()]
+        
+        if not selected_empty_objects:
+            self.report({'INFO'}, "No empty objects selected")
+            return {"CANCELLED"}
+        
+        print("Detected Empty Objects:")
+        for obj in selected_empty_objects:
+            print(f"Detected object: {obj.name} at {obj.location}")
+
+        for obj in selected_empty_objects:
+            obj.location.x += 1
+        
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in selected_empty_objects:
+            obj.select_set(True)
+        
+        self.report({'INFO'}, f"{len(selected_empty_objects)} empty object(s) detected")
+        return {"FINISHED"}
+
+    def invoke(self, context, event):
+        return self.execute(context)
 
 
 def register():
-    bpy.utils.register_class(SNA_OT_Intersectingemptyobjects_50398)
-    bpy.utils.register_class(VIEW3D_PT_CustomPanel)
+    bpy.utils.register_class(BlockUnitPanel)
+    bpy.utils.register_class(CreateBlockUnitsOperator)
     bpy.utils.register_class(APVSettings)
-    bpy.types.Scene.apv_settings = bpy.props.PointerProperty(type=APVSettings)
-    bpy.utils.register_class(OBJECT_OT_ImportCollection)
-    # bpy.utils.register_class(ImportBlendPanel)
+    bpy.utils.register_class(SNA_OT_Intersectingemptyobjects_50398)
+    bpy.utils.register_class(SNA_OT_DetectedObjects)
+    
+    bpy.types.Scene.block_units_rows = bpy.props.IntProperty(
+        name="Rows", default=10, min=1
+    )
+    bpy.types.Scene.block_units_columns = bpy.props.IntProperty(
+        name="Columns", default=10, min=1
+    )
+    bpy.types.Scene.block_units_z = bpy.props.IntProperty(
+        name="Z collections", default=10, min=1
+    )
+    bpy.types.Scene.block_units_environment = bpy.props.EnumProperty(
+        name="Environment",
+        items=[('STADIUM', "Stadium", "Stadium environment"),
+               ('BAY', "Bay", "Bay environment"),
+               ('COAST', "Coast", "Coast environment"),
+               ('SNOW', "Snow", "Snow environment"),
+               ('DESERT', "Desert", "Desert environment"),
+               ('RALLY', "Rally", "Rally environment"),
+               ('ISLAND', "Island", "Island environment")],
+        default='STADIUM'
+    )
 
+    bpy.types.Scene.apv_settings = bpy.props.PointerProperty(type=APVSettings)
 
 def unregister():
-    bpy.utils.unregister_class(SNA_OT_Intersectingemptyobjects_50398)
-    bpy.utils.unregister_class(VIEW3D_PT_CustomPanel)
+    bpy.utils.unregister_class(BlockUnitPanel)
+    bpy.utils.unregister_class(CreateBlockUnitsOperator)
     bpy.utils.unregister_class(APVSettings)
+    bpy.utils.unregister_class(SNA_OT_Intersectingemptyobjects_50398)
+    bpy.utils.unregister_class(SNA_OT_DetectedObjects)
+    
+    del bpy.types.Scene.block_units_rows
+    del bpy.types.Scene.block_units_columns
+    del bpy.types.Scene.block_units_z
+    del bpy.types.Scene.block_units_environment
     del bpy.types.Scene.apv_settings
-    bpy.utils.unregister_class(OBJECT_OT_ImportCollection)
-    # bpy.utils.unregister_class(ImportBlendPanel)
-
-
-if __name__ == "__main__":
-    register()
