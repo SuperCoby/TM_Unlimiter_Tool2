@@ -10,9 +10,6 @@
     <img src="https://img.shields.io/badge/Discord%20-official-brightgreen" alt="Discord Unlimiter"/>
   </a>
   <img src="https://img.shields.io/badge/Trackmania-Nation%20Forever-brightgreen" alt="Trackmania"/>
-  <a href="https://github.com/SuperCoby/TM_Unlimiter_Tool2/releases" target="_blank">
-    <img src="https://img.shields.io/github/downloads/SuperCoby/TM_Unlimiter_Tool2/total" alt="GitHub Downloads"/>
-  </a>
 </p>
 
 
