@@ -25,6 +25,7 @@ from .properties import (
     ToolsProperties,
     DetectionProperties,
     CustomTextureProperties,
+    BlockAnimationProperties,
 )
 from .operators import (
     OT_Imports,
@@ -41,6 +42,7 @@ from .operators import (
     OT_AutoMat,
     OT_Separate,
     OT_Collision,
+    OT_BlockAnimation,
 )
 from .panels import (
     PT_main,
@@ -50,6 +52,7 @@ from .panels import (
     PT_Tool2,
     PT_Detection,
     PT_CustomTexture,
+    PT_BlockAnimation,
     PT_CollisionHeader,
     PT_DebugUnlimiter,
 )
@@ -69,6 +72,7 @@ modules = (
     ToolsProperties,
     DetectionProperties,
     CustomTextureProperties,
+    BlockAnimationProperties,
 
     OT_Imports,
     OT_Items_Edges_Import,
@@ -84,6 +88,7 @@ modules = (
     OT_AutoMat,
     OT_Separate,
     OT_Collision,
+    OT_BlockAnimation,
 
     PT_main,
     PT_Imports,
@@ -92,6 +97,7 @@ modules = (
     PT_Tool2,
     PT_Detection,
     PT_CustomTexture,
+    PT_BlockAnimation,
     PT_CollisionHeader,
     PT_DebugUnlimiter,
 
@@ -114,6 +120,8 @@ def unregister():
         if hasattr(mod, "unregister"):
             mod.unregister()
         for cls in reversed(getattr(mod, "classes", ())):
-            bpy.utils.unregister_class(cls)
+            # Déjà retirée (ex. l'ancien script tm_block_animation.py lancé à côté a les mêmes classes)
+            if getattr(cls, "is_registered", False):
+                bpy.utils.unregister_class(cls)
 
     LzoShim.uninstall()

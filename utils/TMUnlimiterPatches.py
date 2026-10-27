@@ -3,6 +3,7 @@ import addon_utils
 import functools
 import re
 from . import TMUnlimiter as tmu
+from .BlockAnimation import wrap_plug_tree_animation
 from ..properties.BlockDefinitionsProperties import extra_props
 from ..panels.PT_BlockDefinitions import (
     draw_block_definition_item,
@@ -106,11 +107,12 @@ def apply_patches():
     if not hasattr(export_cls.invoke, "tmu_original"):
         export_cls.invoke = _wrap_export_invoke(export_cls.invoke)
 
-    # Noms exportés sans .001
+    # Noms exportés sans .001 + animation des objets (FuncTree, utils/BlockAnimation.py)
     tree_mod = tmu.module("plug_tree")
     if tree_mod is not None and not hasattr(tree_mod.plug_tree_from_object, "tmu_original"):
         original = tree_mod.plug_tree_from_object
-        wrapped = _wrap_plug_tree(original)
+        wrapped = _wrap_plug_tree(wrap_plug_tree_animation(original))
+        wrapped.tmu_original = original  # remove_patches() restaure la fonction de tmunlimiter
         for mod in (tree_mod, tmu.module("block_definition"), tmu.module("plug_solid")):
             if mod is not None and getattr(mod, "plug_tree_from_object", None) is original:
                 mod.plug_tree_from_object = wrapped
