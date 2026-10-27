@@ -57,6 +57,11 @@ The tools are in the 3D View sidebar (**N**), **TM** tab.
 ### Render Icon
 - 64×64 block icon render, transparent background by default
 
+### Block Animation
+- Animate an object with keyframes: a rotation on one axis **or** a translation (the game loops between the first and last keyframe)
+- **In the block (fake collision)**: exported into the .Block.Gbx with tmunlimiter, only the visual moves
+- **In the map + collision**: written as a TMUnlimiter **Block Motion** onto the blocks already placed in a .Challenge.Gbx map (visual and collision move), with an optional .bak backup
+
 ### With tmunlimiter_blender_plugin
 - **Auto Block Definition**: creates a block definition from the selected collection (Ground/Grass/Air models, triggers, spawns, waypoint type, block units)
 - **Export Multiple**, with collection/subfolder entries to sort the exported files into folders (indented, foldable list)
