@@ -2,7 +2,7 @@ import os
 import bpy
 from bpy.props import *
 from bpy.types import Operator
-from .. import ADDON_ROOT_PATH
+from ..utils.Functions import ADDON_ROOT_PATH
 
 
 class TM_OT_Items_Edges_Import(Operator):

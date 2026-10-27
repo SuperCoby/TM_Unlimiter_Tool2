@@ -12,13 +12,14 @@ class TM_OT_ImportItem(Operator, ExportHelper):
     def execute(self, context):
         err = None
         print(self.filepath)
-        if self.filepath.lower().endswith(".item."):
+        if self.filepath.lower().endswith((".item.", ".solid.", ".block.")):
             err = import_item_gbx(self.filepath+"Gbx")
         else:
             import_items_gbx_folder(self.filepath)
 
         if err:
-            show_report_popup("Exporting error!", [err], "ERROR")
+            self.report({'ERROR'}, err)
+            return {'CANCELLED'}
 
         return {'FINISHED'}
 

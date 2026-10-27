@@ -1,6 +1,6 @@
 import bpy
-from .. import addon_prefs
-from ..operators.OT_Materials import auto_refresh
+from ..utils.Functions import addon_prefs
+from ..utils.TextureCache import auto_refresh
 
 
 class SNA_PT_Materials(bpy.types.Panel):

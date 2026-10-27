@@ -1,79 +1,231 @@
+from datetime import datetime
+import subprocess
+import bpy
+import os
 import re
+import math
+import pprint
+from inspect import currentframe, getframeinfo
+
+
 from .Constants import *
-from .. import ADDON_ROOT_PATH
 
-def fix_slash(filepath: str) -> str: return filepath
-def get_addon_path() -> str: return fix_slash(ADDON_ROOT_PATH + "/")
 
-def get_blendermania_dotnet_path() -> str:
-    from .Constants import BLENDER_INSTANCE_IS_DEV
-    if BLENDER_INSTANCE_IS_DEV:
-        return fr"D:\Art\Blender\blendermania-dotnet\blendermania-dotnet\bin\Release\net7.0\win-x64\publish\blendermania-dotnet.exe"
+# Dossier racine de l'addon et accès à ses préférences
+ADDON_ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ADDON_ID = __name__.split(".")[0]
+
+
+def addon_prefs():
+    return bpy.context.preferences.addons[ADDON_ID].preferences
+
+
+def fix_slash(filepath: str) -> str:
+    """convert \\\+ to /"""
+    filepath = re.sub(r"\\+", "/", filepath)
+    filepath = re.sub(r"\/+", "/", filepath)
+    return filepath
+
+
+def is_file_existing(filepath: str) -> bool:
+    return os.path.isfile(filepath)
+
+
+def get_addon_path() -> str:
+    return fix_slash(ADDON_ROOT_PATH + "/")
+
+
+def get_addon_assets_path() -> str:
+    return get_addon_path() + "assets/"
+
+
+def radians(v, reverse=False) -> float:
+    """return math.radians, example: some_blender_object.rotation_euler=(radian, radian, radian)"""
+    return math.radians(v) if reverse is False else math.degrees(v)
+
+
+def radian_list(*rads) -> list:
+    """return math.radians as list"""
+    return [radians(rad) for rad in rads]
+
+
+def get_path_filename(filepath: str, remove_extension=False) -> str:
+    filepath = fix_slash(filepath).split("/")[-1]
+
+    if remove_extension:
+        filepath = re.sub(r"\.\w+$", "", filepath, flags=re.IGNORECASE)
+
+    return filepath
+
+
+def select_obj(obj) -> bool:
+    """selects object, no error during view_layer=scene.view_layers[0]"""
+    if obj.hide_get() is False:
+        obj.select_set(True)
+        return True
+
+    return False
+
+
+def deselect_all_objects() -> None:
+    """deselects all objects in the scene, works only for visible ones"""
+    bpy.ops.object.select_all(action="DESELECT")
+
+
+def set_active_object(obj) -> None:
+    """set active object"""
+    if obj.name in bpy.context.view_layer.objects:
+        bpy.context.view_layer.objects.active = obj
+        select_obj(obj)
+
+
+def unset_active_object() -> None:
+    """unset active object, deselect all"""
+    bpy.context.view_layer.objects.active = None
+    deselect_all_objects()
+
+
+debug_list = ""
+
+
+def debug(
+    *args,
+    pp=False,
+    raw=False,
+    add_to_list=False,
+    save_list_to=None,
+    clear_list=False,
+    open_file=False,
+) -> None:
+    """better printer, adds line and filename as prefix"""
+    global debug_list
+    frameinfo = getframeinfo(currentframe().f_back)
+    line = str(frameinfo.lineno)
+    name = str(frameinfo.filename).split("\\")[-1]
+    time = datetime.now().strftime("%H:%M:%S")
+
+    line = line if int(line) > 10 else line + " "
+    line = line if int(line) > 100 else line + " "
+    line = line if int(line) > 1000 else line + " "
+    line = line if int(line) > 10000 else line + " "
+    # line = line if int(line) > 100000   else line + " "
+
+    base = f"{line}, {time}, {name}"
+    baseLen = len(base)
+    dashesToAdd = 40 - baseLen
+
+    # make sure base is 40 chars long, better reading between different files
+    if dashesToAdd > 0:
+        base += "-" * dashesToAdd
+
+    if raw:
+        base = ""
+
+    print(base, end="")
+    if add_to_list:
+        debug_list += base
+
+    if pp is True:
+        for arg in args:
+            pprint.pprint(arg, width=160)
+            if add_to_list:
+                debug_list += pprint.pformat(arg)
     else:
-        return get_addon_path() + f"utils/{BLENDERMANIA_DOTNET}.exe"
+        for arg in args:
 
-def install_blendermania_dotnet()->None:
-    """download and install blendermania-dotnet"""
-    tm_props = get_global_props()
-    url      = WEBSPACE_DOTNET_EXECUTABLE
-    
-    tm_props.CB_DL_ProgressShow = True
+            text = " " + str(arg)
+            print(text, end="")
+            if add_to_list:
+                debug_list += text
 
-    extract_to   = get_addon_assets_path()
-    file_path    = f"""{extract_to}/{BLENDERMANIA_DOTNET}.zip"""
-    progressbar = "NU_DL_Progress"
+    print()
+    if add_to_list:
+        debug_list += "\n"
 
-    def on_success():
-        delete_files_by_wildcard(f"{extract_to}/Blendermania_Dotnet*.exe")
+    if save_list_to is not None:
+        with open(fix_slash(save_list_to), "w") as f:
+            f.write(debug_list)
+        if open_file and os.name == "nt":  # notepad : Windows uniquement
+            p = subprocess.Popen(f"notepad {save_list_to}")
 
-        tm_props.CB_DL_ProgressRunning = False
-        unzip_file_into(file_path, extract_to)
-        def run(): 
-            tm_props.CB_DL_ProgressShow = False
-        timer(run, 5)
-        debug(f"downloading & installing blendermania-dotnet {get_global_props().LI_gameType} successful")
-        os.remove(file_path)
+    if clear_list:
+        debug_list = ""
 
-    def on_error(msg):
-        tm_props.ST_DL_ProgressErrors = msg or "unknown error"
-        tm_props.CB_DL_ProgressRunning = False
-        debug(f"downloading & installing blendermania-dotnet {get_global_props().LI_gameType} failed, error: {msg}")
 
-    create_folder_if_necessary(extract_to)
-    debug(f"try to download & install blendermania-dotnet")
+def redraw_panels(self, context):
+    try:
+        context.area.tag_redraw()
+    except AttributeError:
+        pass  # works fine but spams console full of errors... yes
 
-    print(url)
-    download = DownloadTMFile(url, file_path, progressbar, on_success, on_error)
-    download.start()
-    tm_props.NU_DL_Progress        = 0
-    tm_props.ST_DL_ProgressErrors  = ""
-    tm_props.CB_DL_ProgressRunning = True
 
-    #loop over viewlayer (collection->children) <-recursive until obj col[0] found
-    for hierachy_col in hierachy: #hierachy collection
-        
-        #set first collection
-        if current_col == "": 
-            current_col = view_layer.layer_collection.children[hierachy_col]
-        
+def show_report_popup(
+    title=str("some error occured"), infos: tuple = (), icon: str = "INFO"
+):
+    """create a small info(text) popup in blender, write infos to a file on desktop"""
+    frameinfo = getframeinfo(currentframe().f_back)
+    line = str(frameinfo.lineno)
+    name = str(frameinfo.filename).split("\\")[-1]
+    pyinfos = f"\n\nLINE: {line}\nFILE: {name}"
+
+    title = str(title)
+
+    def draw(self, context):
+        # self.layout.label(text=f"This report is saved at: {desktopPath} as {fileName}.txt", icon="FILE_TEXT")
+        for info in infos:
+            self.layout.label(text=str(info))
+
+    bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
+
+
+def get_global_props() -> object:
+    return bpy.context.scene.tmu_icon_props
+
+
+def is_obj_visible_by_name(name: str) -> bool:
+    """check if object will be visible ingame"""
+    name = name.lower()
+    return not name.startswith("_") or name.startswith(
+        SPECIAL_NAME_PREFIX_NOTCOLLIDABLE
+    )
+
+
+def load_image_into_blender(texpath: str) -> tuple:
+    """load image texture into blender, return tuple(bool(success), texNAME)"""
+    imgs = bpy.data.images
+    texpath = fix_slash(texpath)
+    texName = get_path_filename(texpath)
+
+    if not texpath:
+        return False, ""
+
+    debug(f"try to load texture into blender: {texpath}")
+
+    if is_file_existing(filepath=texpath):
+
+        if texName not in imgs:
+            imgs.load(texpath)
+            debug(f"texture loaded: { texName }")
+
         else:
-            current_col = current_col.children[hierachy_col]
-            
-        if current_col.name == col.name: #last collection found
+            debug(f"texture already loaded: { texName }")
 
-            if current_col.exclude or current_col.is_visible is False:
-                collection_is_excluded = True # any col in hierachy is not visible or enabled, ignore this col.
-                break
-            
+        return True, texName
 
-    return True if collection_is_excluded else False
+    else:
+        debug(f"failed to find file: {texName}")
+        return False, texName
+
+
+def add_indents(text: str, tab_count: int = 1) -> str:
+    prefix = "    " * tab_count
+    return prefix + text.replace("\n", "\n" + prefix)
+
 
 def get_abs_path(path: str):
     return os.path.abspath(path) if path else ""
 
-def get_global_props() -> object:
-    return bpy.context.scene.tm_props
-    
+
 def ireplace(old, new, text):
     idx = 0
     while idx < len(text):
@@ -81,8 +233,5 @@ def ireplace(old, new, text):
         if index_l == -1:
             return text
         text = text[:index_l] + new + text[index_l + len(old):]
-        idx = index_l + len(new) 
+        idx = index_l + len(new)
     return text
-    
-    
-

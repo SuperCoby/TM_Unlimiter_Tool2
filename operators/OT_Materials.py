@@ -1,131 +1,13 @@
 import bpy
-import os
-import bpy.utils.previews
-from bpy.props import EnumProperty, StringProperty
-from .. import addon_prefs
-
-
-PREVIEW_COLLECTIONS = {}
-CACHED_TEXTURE_ITEMS = {}
-
-
-def get_texture_dir_path(ty=None):
-    ty = ty or bpy.context.scene.tm_material_type
-    return getattr(addon_prefs(), f"{ty.lower()}_path")
-
-
-def get_image_path(ty=None):
-    ty = ty or bpy.context.scene.tm_material_type
-    folder = get_texture_dir_path(ty)
-    image_name = getattr(bpy.context.scene, f'tm_{ty.lower()}_texture')
-
-    if not folder or not image_name:
-        return ''
-
-    return os.path.join(folder, image_name)
-
-
-# Refresh cached list of texture items
-def refresh(ty=None):
-    ty = ty or bpy.context.scene.tm_material_type
-    folder = get_texture_dir_path(ty)
-
-    items = []
-    CACHED_TEXTURE_ITEMS[ty] = items
-
-    for i, fn in enumerate(os.listdir(folder)):
-        ident = fn
-        name = fn
-        description = ""
-        icon = load_preview_icon(os.path.join(folder, fn), ty)
-        items.append((ident, name, description, icon, i))
-
-
-# Refresh a texture list if it's not in the cache
-def auto_refresh(ty=None):
-    ty = ty or bpy.context.scene.tm_material_type
-    if ty in CACHED_TEXTURE_ITEMS:
-        return
-    try:
-        refresh(ty)
-    except Exception as e:
-        pass
-
-
-# Callback run when a texture path preference changed
-def on_texture_path_changed(ty):
-    global PREVIEW_COLLECTIONS
-    global CACHED_TEXTURE_ITEMS
-
-    del CACHED_TEXTURE_ITEMS[ty]
-    if ty in PREVIEW_COLLECTIONS:
-        bpy.utils.previews.remove(PREVIEW_COLLECTIONS[ty])
-        del PREVIEW_COLLECTIONS[ty]
-
-
-def fetch_texture_items(ty):
-    items = CACHED_TEXTURE_ITEMS.get(ty, [])
-    filter = bpy.context.scene.tm_texture_filter
-
-    if filter:
-        filter = filter.lower()
-        items = [item for item in items if filter in item[0].lower()]
-
-    return items
-
-
-def fetch_texture_items_tmnf(self, context):
-    return fetch_texture_items('TMNF')
-
-def fetch_texture_items_tm2(self, context):
-    return fetch_texture_items('TM2')
-
-def fetch_texture_items_tm20(self, context):
-    return fetch_texture_items('TM20')
-
-
-def load_preview_icon(path, ty=None):
-    ty = ty or bpy.context.scene.tm_material_type
-
-    pcol = PREVIEW_COLLECTIONS.get(ty)
-    if pcol is None:
-        pcol = PREVIEW_COLLECTIONS[ty] = bpy.utils.previews.new()
-
-    if not path in pcol:
-        try:
-            pcol.load(path, path, "IMAGE")
-        except Exception:
-            return 0
-
-    return pcol[path].icon_id
-
-
-def create_material(name):
-    bpy.ops.object.material_slot_add('INVOKE_DEFAULT')
-
-    material = bpy.data.materials.new(name=name)
-    material.use_nodes = True
-
-    slot_index = bpy.context.view_layer.objects.active.active_material_index
-    bpy.context.active_object.material_slots[slot_index].material = material
-
-    return material
-
-
-def add_texture_to_material(material, img_path):
-    node_tree = material.node_tree
-
-    img_node = node_tree.nodes.new(type='ShaderNodeTexImage')
-    img_node.image = bpy.data.images.load(
-        filepath=img_path,
-        check_existing=True,
-    )
-
-    for node in node_tree.nodes:
-        if node.type == 'BSDF_PRINCIPLED':
-            node_tree.links.new(img_node.outputs['Color'], node.inputs['Base Color'])
-            img_node.location = node.location[0] - 350, node.location[1] - 50
-            break
+from ..utils.TextureCache import (
+    get_texture_dir_path,
+    get_image_path,
+    material_name,
+    refresh,
+    create_material,
+    add_texture_to_material,
+    clear_cache,
+)
 
 
 # Refresh cached list of textures.
@@ -175,10 +57,13 @@ class SNA_OT_AddTexture(bpy.types.Operator):
         return True
 
     def execute(self, context):
-        add_texture_to_material(
-            bpy.context.object.active_material,
-            get_image_path(),
-        )
+        img_path = get_image_path()
+        if not img_path:
+            return {'CANCELLED'}
+
+        material = bpy.context.object.active_material
+        add_texture_to_material(material, img_path)
+        material.name = material_name(img_path)
         return {"FINISHED"}
 
 
@@ -201,7 +86,7 @@ class SNA_OT_AddTextureMaterial(bpy.types.Operator):
         if not img_path:
             return {'CANCELLED'}
 
-        mat = create_material(os.path.basename(img_path))
+        mat = create_material(material_name(img_path))
         add_texture_to_material(mat, img_path)
         return {"FINISHED"}
 
@@ -213,40 +98,5 @@ classes = (
 )
 
 
-scene_props = (
-    ("tm_material_type", EnumProperty(
-        name='TrackMania Material Type',
-        items=[
-            ('TMNF', 'TMNF', 'TrackMania Nations Forever'),
-            ('TM2', 'TM²', 'TrackMania²'),
-            ('TM20', 'TM20', 'TrackMania 2020'),
-        ],
-    )),
-    ("tm_tmnf_texture", EnumProperty(
-        name='TMNF Texture',
-        items=fetch_texture_items_tmnf,
-    )),
-    ("tm_tm2_texture", EnumProperty(
-        name='TM² Texture',
-        items=fetch_texture_items_tm2,
-    )),
-    ("tm_tm20_texture", EnumProperty(
-        name='TM20 Texture',
-        items=fetch_texture_items_tm20,
-    )),
-    ("tm_texture_filter", StringProperty(
-        name='Filter',
-        description='Filter textures by names'
-    )),
-)
-
-
 def unregister():
-    global PREVIEW_COLLECTIONS
-    global CACHED_TEXTURE_ITEMS
-
-    for pcol in PREVIEW_COLLECTIONS.values():
-        bpy.utils.previews.remove(pcol)
-
-    PREVIEW_COLLECTIONS = {}
-    CACHED_TEXTURE_ITEMS = {}
+    clear_cache()

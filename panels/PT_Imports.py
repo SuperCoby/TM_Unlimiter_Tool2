@@ -13,24 +13,11 @@ class TM_PT_Imports(bpy.types.Panel):
         layout = self.layout
 
         box = layout.box()
-        col = box.column(align=True)
-        row = col.row(align=True)
+        row = box.row(align=True)
         row.scale_y = 1.5
-
-        col = box.column(align=True)
-        row = col.row()
-        row.scale_y = 0.8
-        row.label(text="Trackmania:")
-        row = col.row()
-        row.alert = True
-        row.scale_y = 0.7
-
-        row = col.row(align=True)
-        row.scale_y = 1.5
-        row.operator(TM_OT_ImportItem.bl_idname, text=f"Import .Item.Gbx", icon=ICON_IMPORT)
+        row.operator(TM_OT_ImportItem.bl_idname, text=".Item / .Solid / .Block.Gbx", icon=ICON_IMPORT)
 
 
 classes = (
     TM_PT_Imports,
 )
-
