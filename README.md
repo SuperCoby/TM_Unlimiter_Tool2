@@ -22,9 +22,6 @@ TM Unlimiter Tool for Unlimiter 2.0: a Blender add-on to build custom TrackMania
 - **Blender 5.1.1** or newer
 - Optional: [TrackMania Unlimiter: Custom Block exporter](https://github.com/tomek0055/tmunlimiter_blender_plugin) (`tmunlimiter_blender_plugin`), needed for the block export features. Without it, those features are hidden and the rest of the add-on works normally.
 
-No external program is needed anymore (the old dotnet.exe is no longer used).
-
-
 ## Installation
 
 1. Download `TM_Unlimiter_Tool-main.zip` from the [latest release](https://github.com/SuperCoby/TM_Unlimiter_Tool2/releases/latest)
